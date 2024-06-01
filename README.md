@@ -1,6 +1,7 @@
 # pvzHE-Archiver
  植物大战僵尸杂交版存档管理工具
 
+![Screenshot 2024-06-01 162632](https://github.com/HNRobert/pvzHE-Archiver/assets/120773486/aed24a59-5555-4c50-a25c-d12f9d5dcd01)
 
 ## 功能概述
 
