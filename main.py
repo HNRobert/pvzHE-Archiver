@@ -216,7 +216,7 @@ def mk_ui():
             note_data[_t] = c_note
         write_json(note_data)
         save_btn.config(text="成功!")
-        root.after(1000, lambda: save_btn.config(text="保存"))
+        root.after(1000, lambda: save_btn.config(text="保存备注"))
 
     def checking_new_save():
         global has_new_save
@@ -457,12 +457,12 @@ def mk_ui():
     check_new_save_thread = Thread(target=checking_new_save, daemon=True)
     check_new_save_thread.start()
 
-    about_text = """版本: v1.0.0
-更新时间：2024年6月1日 15:00
+    about_text = """版本: v0.0.2
+更新时间：2024年6月2日 17:30
 作者：Robert He
 
 本软件适用于植物大战僵尸杂交版的
-【游戏存档管理】，
+【游戏自动存档+存档管理】，
 可以在退出游戏返回主菜单时保存游戏进度，
 也可以自动在无尽模式进入下一个关卡时自动保存，
 并在历史任意关卡的任何时间节点重新切入。
@@ -470,7 +470,7 @@ def mk_ui():
 
 当前软件为测试版，
 仅支持抽奖盒子的关卡名称显示。
-后续将继续更新"""
+后续将继续更新，加入筛选排序等功能"""
 
     main_menu = tk.Menu(root)
     help_menu = tk.Menu(main_menu, tearoff=False)
