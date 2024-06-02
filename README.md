@@ -1,11 +1,11 @@
 # pvzHE-Archiver
  植物大战僵尸杂交版存档管理工具
-
-![Screenshot 2024-06-01 162632](https://github.com/HNRobert/pvzHE-Archiver/assets/120773486/aed24a59-5555-4c50-a25c-d12f9d5dcd01)
+ 
+![Screenshot 2024-06-02 172536](https://github.com/HNRobert/pvzHE-Archiver/assets/120773486/29f72c1a-f282-4fc0-8050-809fffe25368)
 
 ## 功能概述
 
-本软件适用于植物大战僵尸杂交版的【游戏存档管理】，
+本软件适用于植物大战僵尸杂交版的【游戏自动存档+存档管理】，
 
 可以在退出游戏返回主菜单时保存游戏进度，
 
@@ -18,4 +18,4 @@
 
 当前软件处于测试阶段，
 仅支持抽奖盒子的关卡名称显示。
-后续将继续更新
+后续将继续更新，推出筛选与排序功能
