@@ -80,6 +80,8 @@ def parse_hex_data(hex_data):
 
 def get_user_info():
     hex_data = ""  # 读取文件，先解析成十六进制进行保存
+    if not os.path.isfile(USERS_DAT):
+        return {}
     with open(USERS_DAT, 'rb') as dat:
         while a := dat.read(1):  # 可以取得每一个十六进制, read（1）表示每次读取一个字节长度的数值
             if ord(a) <= 15:
@@ -103,7 +105,7 @@ def match_value_from_data_name(data_name):
 
 def list_arched_game_data():
     game_data_dict = {}
-    current_d = os.listdir(HE_ARCHIVER_GAME_DATA_PATH)
+    current_d = os.listdir(HE_ARCHIVER_GAME_DATA_PATH) if os.path.isdir(HE_ARCHIVER_GAME_DATA_PATH) else []
     for file in current_d:  # add a data_name which replaces the user_arch_id and game_id
         file_info_dict = match_value_from_data_name(file)
         user_name, level_name = file_info_dict["user_arch_id"], file_info_dict["game_id"]
@@ -152,11 +154,17 @@ def archive_data(_user_arch_id: str, _scene_id: str, _data_path: str):
 
 
 def scan_new_save():
-    global rescan_savings
+    global rescan_savings, game_exist
     rescan_savings = False
+    game_exist = False
     prev_files = set()
     exist_time_counters = {}
     while continue_scanning:
+        if os.path.isdir(HE_DATA_PATH):
+            game_exist = True
+        else:
+            time.sleep(1)
+            continue
         cur_files = set(os.listdir(HE_DATA_PATH))
         new_files = cur_files - prev_files
         dec_files = prev_files - cur_files
@@ -185,7 +193,6 @@ def process_new_save(_new_files):
     for file in _new_files:
         match = re.search(GAME_DAT_PATTERN, file)
         if match:
-
             file_path = os.path.join(HE_DATA_PATH, file)
             user_arch_id = match.group(1)
             game_id = match.group(2)
@@ -441,6 +448,8 @@ def mk_ui():
     root.bind_all('<Control-s>', lambda event: save_note())
     root.grid_columnconfigure(1, weight=1, minsize=200)
 
+    if not game_exist:
+        tk_messagebox.showwarning(title="提示", message="没有找到植物大战僵尸杂交版的游戏存档")
     arched_game_data = {}
     shown_game_data = {}
     refresh_game_data()
@@ -448,7 +457,7 @@ def mk_ui():
     check_new_save_thread = Thread(target=checking_new_save, daemon=True)
     check_new_save_thread.start()
 
-    about_text = """版本: 0.0.1 beta
+    about_text = """版本: v1.0.0
 更新时间：2024年6月1日 15:00
 作者：Robert He
 
@@ -473,15 +482,18 @@ def mk_ui():
 
 
 def main():
-    global continue_scanning, user_info, note_data
+    global continue_scanning, user_info, note_data, has_new_save
     if has_archiver_process():
         return
 
     continue_scanning = True
+    has_new_save = False
     user_info = get_user_info()
 
     if not os.path.isdir(HE_ARCHIVER_DATA_PATH):
         os.makedirs(HE_ARCHIVER_DATA_PATH)
+    if not os.path.isdir(HE_ARCHIVER_GAME_DATA_PATH):
+        os.makedirs(HE_ARCHIVER_GAME_DATA_PATH)
     if not os.path.isfile(HE_ARCHIVER_ICON):
         with open(HE_ARCHIVER_ICON, "wb") as f:
             f.write(base64.b64decode(b64_icon))
