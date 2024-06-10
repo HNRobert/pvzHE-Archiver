@@ -103,17 +103,24 @@ def match_value_from_data_name(data_name):
     return {"user_arch_id": "", "game_id": "", "date_time": ""}
 
 
+def level_name_of(str_id: str):
+    int_id = int(str_id)
+    if int_id < 512 and int_id >= 256:
+        return f"冒险模式 第{str(int_id - 255)}关"
+    if str_id in LEVEL_NAMES_DATA.keys() and "name" in LEVEL_NAMES_DATA[str_id].keys():
+        return LEVEL_NAMES_DATA[str_id]["name"]
+
+
 def list_arched_game_data():
     game_data_dict = {}
     current_d = os.listdir(HE_ARCHIVER_GAME_DATA_PATH) if os.path.isdir(HE_ARCHIVER_GAME_DATA_PATH) else []
     for file in current_d:  # add a data_name which replaces the user_arch_id and game_id
         file_info_dict = match_value_from_data_name(file)
-        user_name, level_name = file_info_dict["user_arch_id"], file_info_dict["game_id"]
+        user_name = file_info_dict["user_arch_id"]
+        level_name = level_name_of(file_info_dict["game_id"])
         d_t = file_info_dict["date_time"]
         if user_name in user_info.keys():
             user_name = user_info[user_name]["username"]
-        if level_name in LEVEL_NAMES_DATA.keys() and "name" in LEVEL_NAMES_DATA[level_name].keys():
-            level_name = LEVEL_NAMES_DATA[level_name]["name"]
         date_time_label = d_t[:11] + ":" + d_t[11:13] + ":" + d_t[13:]
         file_info_dict["data_name"] = f"{user_name}-{level_name}-{date_time_label}"
         file_info_dict["int_time"] = int(d_t[:8] + d_t[9:])
@@ -458,8 +465,9 @@ def mk_ui():
     check_new_save_thread.start()
 
     about_text = """版本: v0.0.2
-更新时间：2024年6月2日 17:30
+更新时间：2024年6月10日 17:30
 作者：Robert He
+网址：https://github.com/HNRobert/pvzHE-Archiver
 
 本软件适用于植物大战僵尸杂交版的
 【游戏自动存档+存档管理】，
@@ -469,7 +477,6 @@ def mk_ui():
 还有备注功能便于管理归档。
 
 当前软件为测试版，
-仅支持抽奖盒子的关卡名称显示。
 后续将继续更新，加入筛选排序等功能"""
 
     main_menu = tk.Menu(root)
