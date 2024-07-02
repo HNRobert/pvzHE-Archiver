@@ -1,17 +1,17 @@
-import time
 import os
+import shutil
+import time
 import tkinter as tk
 import tkinter.font as tk_font
 import tkinter.messagebox as tk_messagebox
 from threading import Thread
 from tkinter import Tk, ttk
-import shutil
 from typing import List
 
 import mods
-from const import HE_ARCHIVER_GAME_DATA_PATH, HE_DATA_PATH, HE_ARCHIVER_ICON
+from const import HE_ARCHIVER_GAME_DATA_PATH, HE_ARCHIVER_ICON, HE_DATA_PATH
 from global_var import gvar
-from widgetable import WidColData, WidRowData, WidgetTable
+from widgetable import WidColData, WidgetTable, WidRowData
 
 
 def mk_ui():
@@ -47,15 +47,14 @@ def mk_ui():
         ori_data_path = os.path.join(
             HE_DATA_PATH, f"game{_user_arch_id}_{_scene_id}.dat")
         shutil.copy2(arched_data_path, ori_data_path)
-        print(arched_data_path, "Success")
+        print(arched_data_path, "Successfully extracted")
 
     def refresh_game_data(rescan=False):
         _note_data = gvar.get("note_data")
         if rescan:
             gvar.set("rescan_savings", True)
-            refresh_button.config(text="刷新中...")
-            root.after(1500, lambda: refresh_button.config(text="刷新成功!"))
-            root.after(2500, lambda: refresh_button.config(text="刷新"))
+            refresh_button.config(text="刷新成功!")
+            root.after(1500, lambda: refresh_button.config(text="刷新"))
         _arched_game_data = mods.list_arched_game_data()
         _save_rows_data: List[WidRowData] = []
         for _data in _arched_game_data.keys():
@@ -66,6 +65,7 @@ def mk_ui():
             _save_rows_data.append(WidRowData(
                 id=_data, cols_data=save_columns_data, data_storage=_arched_game_data[_data]))
             # save_rows_data[-1].wid_value_info
+        
         saving_data_table.update_rows_data(_save_rows_data)
 
 
@@ -81,6 +81,16 @@ def mk_ui():
         gvar.set("continue_scanning", False)
         root.quit()
         root.destroy()
+
+    def toggle_del_selection_mode():
+        if saving_data_table.select_mode:
+            delete_button.config(text="删除...")
+            items = saving_data_table.get_selected_rows()
+            print(items)
+            saving_data_table.quit_select_mode()
+        else:
+            delete_button.config(text="确定删除")
+            saving_data_table.enter_select_mode()
 
     root = Tk()
     root.title('植物大战僵尸杂交版-存档管理工具')
@@ -98,16 +108,20 @@ def mk_ui():
 
     savings_notice_label = ttk.Label(root, text='存档栏:')
     savings_notice_label.grid(row=0, column=0, padx=10, pady=5, sticky='NSEW')
+    savings_sort_label = ttk.Label(root, text='排序:')
+    savings_sort_label.grid(row=0, column=1, padx=10, pady=5, sticky='NSEW')
+    savings_filter_label =  ttk.Label(root, text='筛选:')
+    savings_filter_label.grid(row=0, column=2, padx=10, pady=5, sticky='NSEW')
 
-    save_username_col = WidColData(0, title="用户名", widget_type=ttk.Label, data_key="user_name",
+    save_username_col = WidColData(1, title="用户名", widget_type=ttk.Label, data_key="user_name",
                                 stretchable=False, min_width=30)
-    save_level_col = WidColData(1, title="关卡名称", widget_type=ttk.Label, data_key="level_name",
+    save_level_col = WidColData(2, title="关卡名称", widget_type=ttk.Label, data_key="level_name",
                                 stretchable=False, min_width=50)
-    save_time_col = WidColData(2, title="保存时间", widget_type=ttk.Label, data_key="save_time",
+    save_time_col = WidColData(3, title="保存时间", widget_type=ttk.Label, data_key="save_time",
                                stretchable=False, min_width=50)
-    save_note_col = WidColData(3, title="备注", widget_type=ttk.Entry, data_key="note",
+    save_note_col = WidColData(4, title="备注", widget_type=ttk.Entry, data_key="note",
                                stretchable=True, min_width=100)
-    save_extract_col = WidColData(4, title="提取", wid_text="提取", active_text="成功!", 
+    save_extract_col = WidColData(5, title="提取", wid_text="提取", active_text="成功!", 
                                   error_active_text="提取出错", active_time=1000, 
                                   widget_type=ttk.Button, 
                                   command=extract_data, stretchable=False, min_width=100)
@@ -116,13 +130,16 @@ def mk_ui():
 
     save_rows_data = []
 
-    saving_data_table = WidgetTable(root, save_columns_data, save_rows_data)
-    saving_data_table.grid(row=1, column=0, padx=11,
-                            columnspan=2, sticky='NSEW')
+    saving_data_table = WidgetTable(
+        root, save_columns_data, save_rows_data, sort_key=lambda col: col.data_storage["int_time"], sort_reverse=True)
+    saving_data_table.grid(row=1, column=0, padx=11, columnspan=3, sticky='NSEW')
 
+    delete_button = ttk.Button(root, text="删除...", command=lambda: toggle_del_selection_mode())
+    delete_button.grid(row=2, column=0, padx=10, ipadx=5, pady=5, sticky='NSEW')
+    
     refresh_button = ttk.Button(
         root, text='刷新', command=lambda: refresh_game_data(True))
-    refresh_button.grid(row=2, column=0, columnspan=3, padx=10, ipadx=5,
+    refresh_button.grid(row=2, column=1, columnspan=2, padx=10, ipadx=5,
                         pady=5, sticky='NSEW')
     close_btn = ttk.Button(root, text='退出', command=exit_program)
     close_btn.grid(row=3, column=0, padx=10, ipadx=5, pady=5, sticky='NSEW')

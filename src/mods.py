@@ -135,7 +135,6 @@ def current_data_path_of(arched_data_name):
 
 
 def archive_data(_user_arch_id: str, _scene_id: str, _data_path: str):
-    global n_s
     if not os.path.isfile(_data_path):
         return
     arched_filename = f"{_user_arch_id}-{_scene_id}-{get_data_mtime(_data_path)}.dat"
@@ -144,7 +143,7 @@ def archive_data(_user_arch_id: str, _scene_id: str, _data_path: str):
     if not os.path.isdir(HE_ARCHIVER_GAME_DATA_PATH):
         os.makedirs(HE_ARCHIVER_GAME_DATA_PATH)
     if not os.path.isfile(arched_data_path):
-        n_s = True
+        gvar.set("n_s", True)
         try:
             shutil.copy2(_data_path, arched_data_path)
             print(arched_data_path + " --> Success")
@@ -184,8 +183,7 @@ def scan_new_save():
 
 
 def process_new_save(_new_files):
-    global has_new_save, n_s
-    n_s = False
+    gvar.set("n_s", False)
     for file in _new_files:
         match = re.search(GAME_DAT_PATTERN, file)
         if match:
@@ -193,11 +191,10 @@ def process_new_save(_new_files):
             user_arch_id = match.group(1)
             game_id = match.group(2)
             archive_data(user_arch_id, game_id, file_path)
-    has_new_save = n_s
+    gvar.set("has_new_save", gvar.get("n_s"))
 
 
 def set_current_gaming(match):
-    global current_gaming
     user_num = match.group(1)
     game_id = match.group(2)
-    current_gaming = {"user_num": user_num, "game_id": game_id}
+    gvar.set("current_gaming", {"user_num": user_num, "game_id": game_id})

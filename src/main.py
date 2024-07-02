@@ -8,15 +8,15 @@ from const import (HE_ARCHIVER_DATA, HE_ARCHIVER_DATA_PATH,
                    HE_ARCHIVER_GAME_DATA_PATH, HE_ARCHIVER_ICON)
 from mods import has_archiver_process, read_json, scan_new_save
 from ui import mk_ui
+from global_var import gvar
 
 
 def main():
-    global continue_scanning, note_data, has_new_save
     if has_archiver_process():
         return
 
-    continue_scanning = True
-    has_new_save = False
+    gvar.set("continue_scanning", True)
+    gvar.set("has_new_save", False)
 
     if not os.path.isdir(HE_ARCHIVER_DATA_PATH):
         os.makedirs(HE_ARCHIVER_DATA_PATH)
@@ -29,7 +29,7 @@ def main():
         with open(HE_ARCHIVER_DATA, 'w') as f:
             json.dump({}, f, indent=4)
 
-    note_data = read_json(HE_ARCHIVER_DATA)
+    gvar.set("note_data", read_json(HE_ARCHIVER_DATA))
 
     scanning_thread = Thread(target=scan_new_save, daemon=True)
     scanning_thread.start()

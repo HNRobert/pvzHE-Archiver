@@ -1,8 +1,8 @@
-from hmac import new
+from calendar import c
+import time
 import tkinter as tk
 from tkinter import ttk
-from typing import Any, Callable, Dict, List, Optional, Type, Union
-
+from typing import Any, Callable, Dict, List, Optional, Type, Tuple
 
 DATA_TYPE_REF: Dict[Type[tk.Widget], Type[tk.Variable]] = {
     ttk.Label: tk.StringVar,
@@ -22,7 +22,9 @@ class WidColData:
                  command: Callable[[Any], Any] = lambda x: None,
                  active_text: Optional[str] = None,
                  error_active_text: Optional[str] = None,
-                 active_time: int = 1000, stretchable: bool = False, min_width: int = 0):
+                 active_time: int = 1000, stretchable: bool = False, min_width: int = 0,
+                 widget_padding: Optional[Tuple] = None,
+                 **kwargs):
         """
         This function initializes various attributes for a column widget in a graphical user interface.
 
@@ -64,6 +66,8 @@ class WidColData:
         the widget to ensure it is displayed with at least the specified width, defaults to 0
         :type min_width: int (optional)
         """
+        if id in [0] and not ("select_col" in kwargs.keys() and kwargs["select_col"]):
+            raise ValueError("id can't be 0, because it's occupied")
         self.id = id
         self.title = title
         self.text = wid_text
@@ -77,12 +81,15 @@ class WidColData:
         self.false_active_text = error_active_text if not (
             error_active_text is None) else wid_text
         self.active_time = active_time
+        self.widget_padding = widget_padding
 
 
 class WidRowData:
     def __init__(self, id: str, cols_data: List[WidColData], data_storage: Optional[dict] = None):
         self.id = id
         self.wid_variable_dict = {}
+        self.wid_variable_dict[0] = tk.BooleanVar()
+        self.wid_variable_dict[0].set(False)
         if data_storage is not None:
             self.data_storage = data_storage
             self.update(cols_data)
@@ -93,28 +100,33 @@ class WidRowData:
         if new_data_storage is not None:
             self.data_storage = new_data_storage
         for col_data in cols_data:
-            var_class = DATA_TYPE_REF.get(col_data.widget_type, tk.StringVar)
-            self.wid_variable_dict[col_data.id] = var_class()
+            self.wid_variable_dict[col_data.id] = DATA_TYPE_REF.get(
+                col_data.widget_type, tk.StringVar)()
             if col_data.data_key is not None and col_data.data_key in self.data_storage:
                 self.wid_variable_dict[col_data.id].set(
                     self.data_storage[col_data.data_key])
 
 
 class WidgetTable(tk.LabelFrame):
-    def __init__(self, master, columns_data: List[WidColData], rows_data: List[WidRowData], add_sep: bool = True, filter_algo: Optional[Callable[[Any], Any]] = None, sort_algo: Optional[Callable[[Any], Any]] = None, **kw):
+    def __init__(self, master, columns_data: List[WidColData], rows_data: List[WidRowData], add_sep: bool = True, filter_algo: Optional[Callable[[Any], Any]] = None, sort_key: Optional[Callable[[WidRowData], Any]] = None, sort_reverse: bool = False, **kw):
+        self.select_mode = False
+
         self.master = master
         self.column_num = len(columns_data)
         self.columns_data = columns_data
+        self.runtime_columns_data: List[WidColData] = columns_data.copy()
         self.column_titles = [c_data.title for c_data in columns_data]
         self._column_label_var = {}
+        self.add_sep = add_sep
 
         self.rows_data = rows_data
         self.shown_rows_data: List[WidRowData] = []
 
-        self.column_widget_dicts = [{} for i in range(self.column_num)]
+        self.column_widget_dicts = []
 
         self.filter_algo = filter_algo
-        self.sort_algo = sort_algo
+        self.sort_algo = sort_key
+        self.sort_reverse = sort_reverse
 
         tk.LabelFrame.__init__(self, master, **kw)
         self.bind_all("<MouseWheel>", self._processwheel)
@@ -140,12 +152,43 @@ class WidgetTable(tk.LabelFrame):
         self.saving_canvas.bind("<Configure>", self._resize_canvas)
 
         self.title_col_sep_list = []
+        self.first_row_sep_list = []
         self.final_row_sep_list = []
-        if add_sep:
-            self._draw_seps()
 
-        self.refresh_column_titles()
+        self.refresh_columns()
+
+        self._select_column_data = WidColData(
+            id=0, wid_text="", widget_type=ttk.Checkbutton, select_col=True, widget_padding=(6, 0, 0, 0))
+
+    def enter_select_mode(self):
+        if self.select_mode:
+            raise Exception("Already in select mode")
+        self.select_mode = True
+        # print([data.id for data in rt_data])
+        # self.runtime_columns_data = rt_data if not (
+        #    rt_data is None) else self.runtime_columns_data
+        self.runtime_columns_data = [
+            self._select_column_data] + self.columns_data
+        print([data.id for data in self.runtime_columns_data])
+        self.refresh_columns()
         self._set_rows()
+
+    # it returns the ids of the selected rows
+    def get_selected_rows(self) -> List[str]:
+        if not self.select_mode:
+            raise Exception("Not in select mode")
+        return [res for res, val in self.get_column_input(self._select_column_data).items() if val]
+
+    def quit_select_mode(self):
+        self.select_mode = False
+        for _row in self.rows_data:
+            _row.wid_variable_dict[0].set(False)
+        self.refresh_columns()
+        print(self.saving_frame.grid_size())
+        for c in self.saving_frame.winfo_children():
+            print(c.info)
+            print(c.grid_info())
+            print()
 
     def get_column_input(self, column_data: WidColData) -> Dict[str, Any]:
         """
@@ -168,20 +211,30 @@ class WidgetTable(tk.LabelFrame):
         self.filter_algo = filter_algo
         self._rearrange_lines()
 
-    def set_sort_algo(self, sort_algo: Optional[Callable[[Any], Any]]):
-        self.sort_algo = sort_algo
+    def set_sort_method(self, key: Optional[Callable[[WidRowData], Any]], reverse: bool = False):
+        self.sort_algo = key
+        self.sort_reverse = reverse
         self._rearrange_lines()
 
-    def refresh_column_titles(self):
-        self.column_titles = [c_data.title for c_data in self.columns_data]
+    def refresh_columns(self, new_columns_data: Optional[List[WidColData]] = None):
+        if not (new_columns_data is None):
+            self.columns_data = new_columns_data
+        if not self.select_mode:
+            self.runtime_columns_data = self.columns_data.copy()
+        self.column_titles = [
+            c_data.title for c_data in self.runtime_columns_data]
         self.column_num = len(self.column_titles)
+        self._clear_widgets()
+        self.column_widget_dicts = [{} for _ in range(self.column_num+1)]
 
         # 清除现有的列标题
         for widget in self._column_label_var.values():
+            widget.grid_remove()
             widget.destroy()
-
         self._column_label_var.clear()
 
+        if self.add_sep:
+            self._draw_seps()
         # 创建并布局新的列标题
         for i, c_label in enumerate(self.column_titles):
             self._column_label_var[i] = ttk.Label(
@@ -189,21 +242,37 @@ class WidgetTable(tk.LabelFrame):
             self._column_label_var[i].grid(row=0, column=i, pady=5)
 
             # 设置列的拉伸属性和最小宽度
-            self.saving_frame.columnconfigure(i, weight=1 if self.columns_data[i].stretchable else 0,
-                                              minsize=self.columns_data[i].min_width)
+            self.saving_frame.columnconfigure(i, weight=1 if self.runtime_columns_data[i].stretchable else 0,
+                                              minsize=self.runtime_columns_data[i].min_width)
+        self._set_rows()
+
+    def _rm_seps(self):
+        for sep in self.title_col_sep_list:
+            sep.grid_remove()
+            sep.destroy()
+        self.title_col_sep_list.clear()
+        for sep in self.first_row_sep_list:
+            sep.grid_remove()
+            sep.destroy()
+        self.first_row_sep_list.clear()
+        for sep in self.final_row_sep_list:
+            sep.grid_remove()
+            sep.destroy()
+        self.final_row_sep_list.clear()
 
     def _draw_seps(self):
+        self._rm_seps()
         for col in range(self.column_num + 1):
             self.title_col_sep_list.append(ttk.Separator(
                 self.saving_frame, orient="vertical"))
             self.title_col_sep_list[-1].grid(row=0, rowspan=1,
                                              column=col, sticky='NSEW')
         for col in range(2 * self.column_num):
-            tar_first_row_sep = ttk.Separator(
-                self.saving_frame, orient='horizontal')
-            tar_first_row_sep.grid(row=col // self.column_num, column=col %
-                                   self.column_num, padx=1, sticky='NSEW')
-        for col in range(self.column_num + 1):
+            self.first_row_sep_list.append(ttk.Separator(
+                self.saving_frame, orient='horizontal'))
+            self.first_row_sep_list[-1].grid(row=col // self.column_num, column=col %
+                                             self.column_num, padx=1, sticky='NSEW')
+        for col in range(self.column_num):
             self.final_row_sep_list.append(ttk.Separator(
                 self.saving_frame, orient="horizontal"))
             self.final_row_sep_list[-1].grid(row=0,
@@ -214,39 +283,46 @@ class WidgetTable(tk.LabelFrame):
         for t_col in range(self.column_num + 1):
             self.title_col_sep_list[t_col].grid_configure(
                 rowspan=current_row_count + 1)
-        for f_col in range(self.column_num + 1):
+        for f_col in range(self.column_num):
             self.final_row_sep_list[f_col].grid_configure(
                 row=current_row_count + 1)
 
     def _remove_row(self, _row_data):
         # Delete the row and reset the button state
         for i in range(self.column_num):
+            self.column_widget_dicts[i][_row_data.id].grid_remove()
             self.column_widget_dicts[i][_row_data.id].destroy()
             self.column_widget_dicts[i].pop(_row_data.id)
         if _row_data in self.rows_data:
             self.rows_data.remove(_row_data)
-        self.saving_canvas.update_idletasks()
-        self.saving_frame.update_idletasks()
+
+    def delete_selected_rows(self, del_rows_data: Optional[List[WidRowData]]):
+        if del_rows_data is None:
+            return
+        for row_data in del_rows_data:
+            self._remove_row(row_data)
         self._rearrange_lines()
 
     def update_rows_data(self, new_rows_data: Optional[List[WidRowData]] = None):
         if not (new_rows_data is None):
             self.rows_data = new_rows_data
-        print('Set')
         self._set_rows()
 
-    def _set_rows(self):
+    def _clear_widgets(self):
         # clear previous widgets
         for widget_dict in self.column_widget_dicts:
             for widget in widget_dict.values():
+                widget.grid_remove()
                 widget.destroy()
             widget_dict.clear()
+
+    def _set_rows(self):
+        self._clear_widgets()
         # place the savings in the root
         for _row_data in self.rows_data:
-            for _col_idx, _col_data in enumerate(self.columns_data):
+            for _col_idx, _col_data in enumerate(self.runtime_columns_data):
                 self.column_widget_dicts[_col_idx][_row_data.id] = self._get_widget_at(
                     _col_data, _row_data)
-
         self._rearrange_lines()
 
     def _act_command(self, ori_command: Optional[Callable[[str], Any]], col_idx: int, row_data: WidRowData):
@@ -256,13 +332,13 @@ class WidgetTable(tk.LabelFrame):
         except Exception as e:
             print(e)
             self.column_widget_dicts[col_idx][row_data.id].config(
-                text=self.columns_data[col_idx].false_active_text)
+                text=self.runtime_columns_data[col_idx].false_active_text)
         else:
             self.column_widget_dicts[col_idx][row_data.id].config(
-                text=self.columns_data[col_idx].active_text)
+                text=self.runtime_columns_data[col_idx].active_text)
         finally:
-            self.master.after(self.columns_data[col_idx].active_time, lambda: self.column_widget_dicts[col_idx][row_data.id].config(
-                text=self.columns_data[col_idx].text))
+            self.master.after(self.runtime_columns_data[col_idx].active_time, lambda: self.column_widget_dicts[col_idx][row_data.id].config(
+                text=self.runtime_columns_data[col_idx].text))
 
     def _get_wid_text(self, col_data: WidColData, row_data: WidRowData):
         if col_data.text is None:
@@ -273,20 +349,20 @@ class WidgetTable(tk.LabelFrame):
 
     def _get_widget_at(self, col_data: WidColData, row_data: WidRowData):
         if col_data.widget_type == ttk.Label:
-            return ttk.Label(self.saving_frame, textvariable=self._get_wid_text(col_data, row_data))
+            return ttk.Label(self.saving_frame, textvariable=self._get_wid_text(col_data, row_data), anchor="center")
         elif col_data.widget_type == ttk.Entry:
             ent = ttk.Entry(self.saving_frame,
                             textvariable=row_data.wid_variable_dict[col_data.id])
             return ent
         elif col_data.widget_type == ttk.Button:
             return ttk.Button(self.saving_frame, text=self._get_wid_text(col_data, row_data).get(),
-                              command=lambda id=row_data.id: self._act_command(
+                              command=lambda: self._act_command(
                                   col_data.command, col_data.id, row_data))
         elif col_data.widget_type == ttk.Checkbutton:
             return ttk.Checkbutton(self.saving_frame, textvariable=self._get_wid_text(col_data, row_data),
-                                   command=lambda id=row_data.id: col_data.command(
-                                       id),
-                                   variable=row_data.wid_variable_dict[col_data.id])
+                                   command=lambda id=row_data.id: col_data.command(id),
+                                   variable=row_data.wid_variable_dict[col_data.id],
+                                   padding=col_data.widget_padding)
         else:
             raise ValueError(
                 f"Unsupported widget type: {col_data.widget_type}")
@@ -298,7 +374,8 @@ class WidgetTable(tk.LabelFrame):
             self.shown_rows_data = list(
                 filter(self.filter_algo, self.shown_rows_data))
         if self.sort_algo is not None:
-            self.shown_rows_data.sort(key=self.sort_algo)
+            self.shown_rows_data.sort(
+                key=self.sort_algo, reverse=self.sort_reverse)
 
         for widget_dict in self.column_widget_dicts:
             for widget in widget_dict.values():
