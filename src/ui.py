@@ -9,9 +9,43 @@ from tkinter import Tk, ttk
 from typing import List
 
 import mods
+from ComBoPicker import Combopicker
 from const import HE_ARCHIVER_GAME_DATA_PATH, HE_ARCHIVER_ICON, HE_DATA_PATH
 from global_var import gvar
 from widgetable import WidColData, WidgetTable, WidRowData
+
+FILTER_KEYS = ["用户名", "关卡名称", "保存时间", "备注"]
+
+TIME_FILTER_DICT = {
+    "<1分钟": 60, 
+    "<1小时": 3600, 
+    "<12小时": 3600*12, 
+    "<1天": 3600*24,
+    "<1周": 3600*24*7, 
+    "<1月": 3600*24*31, 
+    "<1年": 3600*24*365, 
+    "不限": float('inf')
+    }
+
+NOTE_FILTER_DICT = {
+    "有备注": True, 
+    "无备注": False, 
+    "不限": None
+    }
+
+SORT_BASIS_DICT = {
+    "用户名": ["user_name", lambda x: x],
+    "关卡名称": ["level_name", lambda x: x],
+    "保存时间": ["save_time", lambda x: x],
+    "备注内容": ["note", lambda x: x],
+    "备注长度": ["note", lambda x: len(x)]
+    }
+
+SORT_REVERSE_DICT = {
+    "正序": False,
+    "倒序": True
+}
+
 
 
 def mk_ui():
@@ -39,7 +73,8 @@ def mk_ui():
                 gvar.set("has_new_save", False)
             time.sleep(1)
 
-    def extract_data(data_filename: str):  # Here, data_filename is exactly the id of the row
+    # Here, data_filename is exactly the id of the row
+    def extract_data(data_filename: str):
         arched_data_path = os.path.join(
             HE_ARCHIVER_GAME_DATA_PATH, data_filename)
         matched_values = mods.match_value_from_data_name(data_filename)
@@ -57,6 +92,8 @@ def mk_ui():
             root.after(1500, lambda: refresh_button.config(text="刷新"))
         _arched_game_data = mods.list_arched_game_data()
         _save_rows_data: List[WidRowData] = []
+        savings_filter_user_box.update_values([])
+        savings_filter_level_box.update_values([])
         for _data in _arched_game_data.keys():
             # add note into the dict
             _arched_game_data[_data]["note"] = ""
@@ -65,32 +102,90 @@ def mk_ui():
             _save_rows_data.append(WidRowData(
                 id=_data, cols_data=save_columns_data, data_storage=_arched_game_data[_data]))
             # save_rows_data[-1].wid_value_info
-        
+            savings_filter_user_box.append_value(_arched_game_data[_data]["user_name"])
+            savings_filter_level_box.append_value(_arched_game_data[_data]["level_name"])
+
         saving_data_table.update_rows_data(_save_rows_data)
 
+    def set_filter_key():
+        key_filter = {
+            "user_name": savings_filter_user_box.get().split('|'),
+            "level_name": savings_filter_level_box.get().split('|')
+        }
+        comp_filter = {
+            "time_limit": time_limit_var.get(),
+            "note":  note_state_var.get()
+        }
+
+        def filter_func(data: WidRowData):
+            for item in key_filter.items():
+                if item[1] == [""]:
+                    return False
+                if data.data_storage[item[0]] not in item[1]:
+                    return False
+            if time.time() - data.data_storage["abs_int_time"] > comp_filter["time_limit"]:
+                return False
+            target_note_state = NOTE_FILTER_DICT[comp_filter["note"]]
+            if not (target_note_state is None) and \
+                bool(len(data.data_storage["note"])) != target_note_state:
+                return False
+            return True
+        
+        saving_data_table.set_filter_algo(filter_func)
+
+    def set_sort_key():
+        _reverse = SORT_REVERSE_DICT[savings_reverse_box.get()]
+        _sort_basis =  SORT_BASIS_DICT[savings_sort_box.get()][0]
+        _sort_func = SORT_BASIS_DICT[savings_sort_box.get()][1]
+        def sort_key(data: WidRowData):
+            return _sort_func(data.data_storage[_sort_basis])
+        saving_data_table.set_sort_method(sort_key, _reverse)
 
     def resize_root():
         current_line_count = len(saving_data_table.rows_data)
-        root.rowconfigure(1, weight=1, minsize=31 *
+        root.rowconfigure(2, weight=1, minsize=31 *
                           int(bool(current_line_count)) - 5)
         root.minsize(width=800, height=140)
         root.geometry(
             f"{root.winfo_width()}x{min(max(24 * current_line_count + 190, root.winfo_height()), 600)}")
 
+    def toggle_del_selection_mode():
+        if saving_data_table.select_mode:
+            items = saving_data_table.get_selected_rows()
+            succ_rm_savings = []
+            fail_rm_savings = []
+            print(items)
+            reply = False
+            if items:
+                reply = tk_messagebox.askyesnocancel(title="pvzHE Archiver", message=f"你确定要删除这「{len(items)}」个存档?")
+            
+            if reply is None:
+                return
+            
+            delete_button.config(text="删除...")
+
+            if reply is False:
+                saving_data_table.quit_select_mode()
+                return
+            
+            for item in items:
+                if del_item := mods.remove_saving(item):
+                    succ_rm_savings.append(del_item)
+                else:
+                    fail_rm_savings.append(item)
+            saving_data_table.delete_selected_rows(succ_rm_savings)
+            saving_data_table.quit_select_mode()
+            if fail_rm_savings:
+                tk_messagebox.showwarning(
+                    title="删除失败", message=f"删除以下存档时出错:\n{fail_rm_savings}")
+        else:
+            delete_button.config(text="确定删除")
+            saving_data_table.enter_select_mode()
+
     def exit_program():
         gvar.set("continue_scanning", False)
         root.quit()
         root.destroy()
-
-    def toggle_del_selection_mode():
-        if saving_data_table.select_mode:
-            delete_button.config(text="删除...")
-            items = saving_data_table.get_selected_rows()
-            print(items)
-            saving_data_table.quit_select_mode()
-        else:
-            delete_button.config(text="确定删除")
-            saving_data_table.enter_select_mode()
 
     root = Tk()
     root.title('植物大战僵尸杂交版-存档管理工具')
@@ -106,24 +201,57 @@ def mk_ui():
     tkfont.config(family='Microsoft YaHei UI')
     root.option_add("*Font", tkfont)
 
-    savings_notice_label = ttk.Label(root, text='存档栏:')
-    savings_notice_label.grid(row=0, column=0, padx=10, pady=5, sticky='NSEW')
-    savings_sort_label = ttk.Label(root, text='排序:')
-    savings_sort_label.grid(row=0, column=1, padx=10, pady=5, sticky='NSEW')
-    savings_filter_label =  ttk.Label(root, text='筛选:')
-    savings_filter_label.grid(row=0, column=2, padx=10, pady=5, sticky='NSEW')
+    heading_frame = ttk.Frame(root)
+    heading_frame.grid(row=0, rowspan=1, column=0, columnspan=3, sticky='NSEW')
+    heading_frame.columnconfigure(1, weight=1)
+    heading_frame.columnconfigure(4, weight=1)
+
+    select_all_text = tk.StringVar()
+    select_all_text.set("全选")
+
+    savings_filter_user_label = ttk.Label(heading_frame, text='筛选用户:')
+    savings_filter_user_label.grid(
+        row=0, column=0, padx=10, pady=5, sticky='NSEW')
+    savings_filter_user_box = Combopicker(
+        heading_frame, frameheight=190, allname_textvariable=select_all_text)
+    savings_filter_user_box.grid(row=0, column=1, pady=5, sticky='NSEW')
+    savings_filter_user_box.bind("<<CheckButtonSelect>>",
+                                 lambda event: set_filter_key())
+    heading_blank_label = ttk.Label(heading_frame, text='   ')
+    heading_blank_label.grid(row=0, column=2, padx=5, rowspan=1, pady=5, sticky='NSEW')
+    savings_filter_level_label = ttk.Label(heading_frame, text='筛选关卡:')
+    savings_filter_level_label.grid(row=0, column=3, pady=5, sticky='NSEW')
+    savings_filter_level_box = Combopicker(
+        heading_frame, frameheight=190, allname_textvariable=select_all_text)
+    savings_filter_level_box.grid(
+        row=0, column=4, padx=12, pady=5, sticky='NSEW')
+    savings_filter_level_box.bind("<<CheckButtonSelect>>",
+                                  lambda event: set_filter_key())
+
+    savings_sort_label = ttk.Label(heading_frame, text="排序依据:")
+    savings_sort_label.grid(row=1, column=0, padx=10, pady=5, sticky='NSEW')
+    savings_sort_box = ttk.Combobox(heading_frame, values=list(SORT_BASIS_DICT.keys()), state="readonly")
+    savings_sort_box.grid(row=1, column=1, columnspan=1, pady=5, sticky='NSEW')
+    savings_sort_box.bind("<<ComboboxSelected>>", lambda event: set_sort_key())
+    savings_sort_box.current(2) # default value
+    savings_reverse_label = ttk.Label(heading_frame, text="排列顺序:")
+    savings_reverse_label.grid(row=1, column=3, pady=5, sticky='NSEW')
+    savings_reverse_box = ttk.Combobox(heading_frame, values=list(SORT_REVERSE_DICT.keys()), state="readonly")
+    savings_reverse_box.grid(row=1, column=4, padx=12, pady=5, sticky='NSEW')
+    savings_reverse_box.bind("<<ComboboxSelected>>", lambda event: set_sort_key())
+    savings_reverse_box.current(1)
 
     save_username_col = WidColData(1, title="用户名", widget_type=ttk.Label, data_key="user_name",
-                                stretchable=False, min_width=30)
+                                   stretchable=False, min_width=30)
     save_level_col = WidColData(2, title="关卡名称", widget_type=ttk.Label, data_key="level_name",
                                 stretchable=False, min_width=50)
     save_time_col = WidColData(3, title="保存时间", widget_type=ttk.Label, data_key="save_time",
                                stretchable=False, min_width=50)
     save_note_col = WidColData(4, title="备注", widget_type=ttk.Entry, data_key="note",
                                stretchable=True, min_width=100)
-    save_extract_col = WidColData(5, title="提取", wid_text="提取", active_text="成功!", 
-                                  error_active_text="提取出错", active_time=1000, 
-                                  widget_type=ttk.Button, 
+    save_extract_col = WidColData(5, title="提取", wid_text="提取", active_text="成功!",
+                                  error_active_text="提取出错", active_time=1000,
+                                  widget_type=ttk.Button,
                                   command=extract_data, stretchable=False, min_width=100)
     save_columns_data = [save_username_col, save_level_col,
                          save_time_col, save_note_col, save_extract_col]
@@ -132,19 +260,22 @@ def mk_ui():
 
     saving_data_table = WidgetTable(
         root, save_columns_data, save_rows_data, sort_key=lambda col: col.data_storage["int_time"], sort_reverse=True)
-    saving_data_table.grid(row=1, column=0, padx=11, columnspan=3, sticky='NSEW')
+    saving_data_table.grid(row=2, column=0, padx=11,
+                           columnspan=3, sticky='NSEW')
 
-    delete_button = ttk.Button(root, text="删除...", command=lambda: toggle_del_selection_mode())
-    delete_button.grid(row=2, column=0, padx=10, ipadx=5, pady=5, sticky='NSEW')
-    
+    delete_button = ttk.Button(
+        root, text="选择删除...", command=lambda: toggle_del_selection_mode())
+    delete_button.grid(row=3, column=0, padx=10,
+                       ipadx=5, pady=5, sticky='NSEW')
+
     refresh_button = ttk.Button(
         root, text='刷新', command=lambda: refresh_game_data(True))
-    refresh_button.grid(row=2, column=1, columnspan=2, padx=10, ipadx=5,
+    refresh_button.grid(row=3, column=1, columnspan=2, padx=10, ipadx=5,
                         pady=5, sticky='NSEW')
     close_btn = ttk.Button(root, text='退出', command=exit_program)
-    close_btn.grid(row=3, column=0, padx=10, ipadx=5, pady=5, sticky='NSEW')
+    close_btn.grid(row=4, column=0, padx=10, ipadx=5, pady=5, sticky='NSEW')
     save_btn = ttk.Button(root, text='保存备注', command=save_note)
-    save_btn.grid(row=3, column=1, columnspan=2, padx=10, ipadx=25, pady=5,
+    save_btn.grid(row=4, column=1, columnspan=2, padx=10, ipadx=25, pady=5,
                   sticky='NSEW')
     root.bind_all('<Return>', lambda event: save_note())
     root.bind_all('<Control-s>', lambda event: save_note())
@@ -154,7 +285,6 @@ def mk_ui():
         tk_messagebox.showwarning(title="提示", message="没有找到植物大战僵尸杂交版的游戏存档")
     refresh_game_data()
     resize_root()
-
 
     check_new_save_thread = Thread(target=checking_new_save, daemon=True)
     check_new_save_thread.start()
@@ -178,9 +308,31 @@ def mk_ui():
     help_menu = tk.Menu(main_menu, tearoff=False)
     help_menu.add_command(label="关于",
                           command=lambda: tk_messagebox.showinfo(title="关于pvzHE-Archiver", message=about_text))
+
+    adv_filter_menu = tk.Menu(main_menu, tearoff=False)
+
+    time_limit_menu = tk.Menu(adv_filter_menu, tearoff=False)
+    time_limit_var = tk.DoubleVar()
+    time_limit_var.set(float("inf"))
+    for _time_limit in TIME_FILTER_DICT.items():
+        time_limit_menu.add_radiobutton(
+            label=_time_limit[0], variable=time_limit_var, value=_time_limit[1], command=lambda: set_filter_key())
+    adv_filter_menu.add_cascade(label="保存时间", menu=time_limit_menu)
+
+    note_filter_menu = tk.Menu(adv_filter_menu, tearoff=False)
+    note_state_var = tk.StringVar()
+    note_state_var.set("不限")
+    for _note_filter in NOTE_FILTER_DICT.keys():
+        note_filter_menu.add_radiobutton(
+            label=_note_filter, variable=note_state_var, value=_note_filter, command=lambda: set_filter_key())
+    adv_filter_menu.add_cascade(label="备注状态", menu=note_filter_menu)
+
+    main_menu.add_cascade(label="高级筛选", menu=adv_filter_menu)
+
     main_menu.add_cascade(label="帮助", menu=help_menu)
     root.config(menu=main_menu)
     root.mainloop()
+
 
 if __name__ == "__main__":
     import main

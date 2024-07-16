@@ -6,9 +6,9 @@ from threading import Thread
 from b64icon import b64_icon
 from const import (HE_ARCHIVER_DATA, HE_ARCHIVER_DATA_PATH,
                    HE_ARCHIVER_GAME_DATA_PATH, HE_ARCHIVER_ICON)
+from global_var import gvar
 from mods import has_archiver_process, read_json, scan_new_save
 from ui import mk_ui
-from global_var import gvar
 
 
 def main():

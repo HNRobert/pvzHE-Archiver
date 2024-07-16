@@ -1,8 +1,6 @@
-from calendar import c
-import time
 import tkinter as tk
 from tkinter import ttk
-from typing import Any, Callable, Dict, List, Optional, Type, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 DATA_TYPE_REF: Dict[Type[tk.Widget], Type[tk.Variable]] = {
     ttk.Label: tk.StringVar,
@@ -111,7 +109,7 @@ class WidgetTable(tk.LabelFrame):
     def __init__(self, master, columns_data: List[WidColData], rows_data: List[WidRowData], add_sep: bool = True, filter_algo: Optional[Callable[[Any], Any]] = None, sort_key: Optional[Callable[[WidRowData], Any]] = None, sort_reverse: bool = False, **kw):
         self.select_mode = False
 
-        self.master = master
+        self.master: tk.Tk = master
         self.column_num = len(columns_data)
         self.columns_data = columns_data
         self.runtime_columns_data: List[WidColData] = columns_data.copy()
@@ -133,23 +131,23 @@ class WidgetTable(tk.LabelFrame):
         self.columnconfigure(0, weight=1, minsize=200)
         self.rowconfigure(0, weight=1)
 
-        self.saving_canvas = tk.Canvas(self)
-        self.saving_canvas.config(highlightthickness=0)
-        self.saving_canvas.grid(row=0, column=0, columnspan=1, sticky="NSEW")
+        self.table_canvas = tk.Canvas(self)
+        self.table_canvas.config(highlightthickness=0)
+        self.table_canvas.grid(row=0, column=0, columnspan=1, sticky="NSEW")
 
-        self.saving_frame = ttk.Frame(self.saving_canvas)
-        self.saving_frame.columnconfigure(0, weight=1, minsize=200)
+        self.table_frame = ttk.Frame(self.table_canvas)
+        self.table_frame.columnconfigure(0, weight=1, minsize=200)
 
         self.saving_canvas_scrollbar = ttk.Scrollbar(
             self, orient=tk.VERTICAL)
         self.saving_canvas_scrollbar.grid(row=0, column=1, sticky="NSEW")
-        self.saving_canvas_scrollbar.config(command=self.saving_canvas.yview)
+        self.saving_canvas_scrollbar.config(command=self.table_canvas.yview)
 
-        self.saving_canvas.config(
+        self.table_canvas.config(
             yscrollcommand=self.saving_canvas_scrollbar.set)
-        self.canvas_window = self.saving_canvas.create_window(
-            (0, 0), window=self.saving_frame, anchor='nw')
-        self.saving_canvas.bind("<Configure>", self._resize_canvas)
+        self.canvas_window = self.table_canvas.create_window(
+            (0, 0), window=self.table_frame, anchor='nw')
+        self.table_canvas.bind("<Configure>", self._resize_canvas)
 
         self.title_col_sep_list = []
         self.first_row_sep_list = []
@@ -159,6 +157,9 @@ class WidgetTable(tk.LabelFrame):
 
         self._select_column_data = WidColData(
             id=0, wid_text="", widget_type=ttk.Checkbutton, select_col=True, widget_padding=(6, 0, 0, 0))
+        
+        self.master.geometry(
+            f"{self.table_frame.winfo_width()}x{self.table_frame.winfo_height()}")
 
     def enter_select_mode(self):
         if self.select_mode:
@@ -184,11 +185,13 @@ class WidgetTable(tk.LabelFrame):
         for _row in self.rows_data:
             _row.wid_variable_dict[0].set(False)
         self.refresh_columns()
-        print(self.saving_frame.grid_size())
+        print(self.table_frame.grid_size())
+        """
         for c in self.saving_frame.winfo_children():
             print(c.info)
             print(c.grid_info())
             print()
+        """
 
     def get_column_input(self, column_data: WidColData) -> Dict[str, Any]:
         """
@@ -238,11 +241,11 @@ class WidgetTable(tk.LabelFrame):
         # 创建并布局新的列标题
         for i, c_label in enumerate(self.column_titles):
             self._column_label_var[i] = ttk.Label(
-                self.saving_frame, text=c_label)
+                self.table_frame, text=c_label)
             self._column_label_var[i].grid(row=0, column=i, pady=5)
 
             # 设置列的拉伸属性和最小宽度
-            self.saving_frame.columnconfigure(i, weight=1 if self.runtime_columns_data[i].stretchable else 0,
+            self.table_frame.columnconfigure(i, weight=1 if self.runtime_columns_data[i].stretchable else 0,
                                               minsize=self.runtime_columns_data[i].min_width)
         self._set_rows()
 
@@ -264,17 +267,17 @@ class WidgetTable(tk.LabelFrame):
         self._rm_seps()
         for col in range(self.column_num + 1):
             self.title_col_sep_list.append(ttk.Separator(
-                self.saving_frame, orient="vertical"))
+                self.table_frame, orient="vertical"))
             self.title_col_sep_list[-1].grid(row=0, rowspan=1,
                                              column=col, sticky='NSEW')
         for col in range(2 * self.column_num):
             self.first_row_sep_list.append(ttk.Separator(
-                self.saving_frame, orient='horizontal'))
+                self.table_frame, orient='horizontal'))
             self.first_row_sep_list[-1].grid(row=col // self.column_num, column=col %
                                              self.column_num, padx=1, sticky='NSEW')
         for col in range(self.column_num):
             self.final_row_sep_list.append(ttk.Separator(
-                self.saving_frame, orient="horizontal"))
+                self.table_frame, orient="horizontal"))
             self.final_row_sep_list[-1].grid(row=0,
                                              column=col, padx=1, sticky='NSEW')
 
@@ -296,11 +299,12 @@ class WidgetTable(tk.LabelFrame):
         if _row_data in self.rows_data:
             self.rows_data.remove(_row_data)
 
-    def delete_selected_rows(self, del_rows_data: Optional[List[WidRowData]]):
-        if del_rows_data is None:
+    def delete_selected_rows(self, del_rows_id: Optional[List[str]]):
+        if del_rows_id is None:
             return
-        for row_data in del_rows_data:
-            self._remove_row(row_data)
+        for row_id in del_rows_id:
+            if row_data := next((r for r in self.rows_data if r.id == row_id), None):
+                self._remove_row(row_data)
         self._rearrange_lines()
 
     def update_rows_data(self, new_rows_data: Optional[List[WidRowData]] = None):
@@ -349,17 +353,17 @@ class WidgetTable(tk.LabelFrame):
 
     def _get_widget_at(self, col_data: WidColData, row_data: WidRowData):
         if col_data.widget_type == ttk.Label:
-            return ttk.Label(self.saving_frame, textvariable=self._get_wid_text(col_data, row_data), anchor="center")
+            return ttk.Label(self.table_frame, textvariable=self._get_wid_text(col_data, row_data), anchor="center")
         elif col_data.widget_type == ttk.Entry:
-            ent = ttk.Entry(self.saving_frame,
+            ent = ttk.Entry(self.table_frame,
                             textvariable=row_data.wid_variable_dict[col_data.id])
             return ent
         elif col_data.widget_type == ttk.Button:
-            return ttk.Button(self.saving_frame, text=self._get_wid_text(col_data, row_data).get(),
+            return ttk.Button(self.table_frame, text=self._get_wid_text(col_data, row_data).get(),
                               command=lambda: self._act_command(
                                   col_data.command, col_data.id, row_data))
         elif col_data.widget_type == ttk.Checkbutton:
-            return ttk.Checkbutton(self.saving_frame, textvariable=self._get_wid_text(col_data, row_data),
+            return ttk.Checkbutton(self.table_frame, textvariable=self._get_wid_text(col_data, row_data),
                                    command=lambda id=row_data.id: col_data.command(id),
                                    variable=row_data.wid_variable_dict[col_data.id],
                                    padding=col_data.widget_padding)
@@ -370,10 +374,10 @@ class WidgetTable(tk.LabelFrame):
     def _rearrange_lines(self):
         # Copy the list to avoid modifying the original
         self.shown_rows_data = list(self.rows_data)
-        if self.filter_algo is not None:
+        if not(self.filter_algo is None):
             self.shown_rows_data = list(
                 filter(self.filter_algo, self.shown_rows_data))
-        if self.sort_algo is not None:
+        if not(self.sort_algo is None):
             self.shown_rows_data.sort(
                 key=self.sort_algo, reverse=self.sort_reverse)
 
@@ -387,18 +391,21 @@ class WidgetTable(tk.LabelFrame):
                     row=_row_idx + 1, column=_col_idx, padx=5, pady=2, sticky='NSEW')
 
         self._adj_seps()
+        self.update_idletasks()
+        self.table_canvas.update_idletasks()
+        self.table_frame.update_idletasks()
 
     def _processwheel(self, event):
         if event.delta > 0:
-            self.saving_canvas.yview_scroll(-1, tk.UNITS)
+            self.table_canvas.yview_scroll(-1, tk.UNITS)
         else:
-            self.saving_canvas.yview_scroll(1, tk.UNITS)
+            self.table_canvas.yview_scroll(1, tk.UNITS)
 
     def _resize_canvas(self, event):
         # Update canvas' scroll region to match the actual size
         canvas_width = event.width
-        self.saving_canvas.itemconfig(self.canvas_window, width=canvas_width)
-        self.saving_canvas.config(scrollregion=self.saving_canvas.bbox("all"))
+        self.table_canvas.itemconfig(self.canvas_window, width=canvas_width)
+        self.table_canvas.config(scrollregion=self.table_canvas.bbox("all"))
 
 
 if __name__ == "__main__":

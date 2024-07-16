@@ -1,14 +1,15 @@
-import re
+import json
 import os
+import re
 import shutil
 import time
-import json
 
 from win32gui import FindWindow, ShowWindow
 
-from levels_name_data import DATA as LEVEL_NAMES_DATA
+from const import (ARCHED_DAT_PATTERN, GAME_DAT_PATTERN, HE_ARCHIVER_DATA,
+                   HE_ARCHIVER_GAME_DATA_PATH, HE_DATA_PATH, USERS_DAT)
 from global_var import gvar
-from const import HE_DATA_PATH, HE_ARCHIVER_DATA, USERS_DAT, ARCHED_DAT_PATTERN, HE_ARCHIVER_GAME_DATA_PATH, GAME_DAT_PATTERN
+from levels_name_data import DATA as LEVEL_NAMES_DATA
 
 
 def has_archiver_process():
@@ -115,6 +116,8 @@ def list_arched_game_data():
         file_info_dict["level_name"] = level_name
         file_info_dict["save_time"] = date_time_label
         file_info_dict["int_time"] = int(d_t[:8] + d_t[9:])
+        file_info_dict["abs_int_time"] = os.stat(
+            os.path.join(HE_ARCHIVER_GAME_DATA_PATH, file)).st_mtime
         game_data_dict[file] = file_info_dict
     return game_data_dict
     # {filename: {"user_arch_id": str, "game_id": str, "date_time": str, "data_name": str, "int_time": int}}
@@ -198,3 +201,16 @@ def set_current_gaming(match):
     user_num = match.group(1)
     game_id = match.group(2)
     gvar.set("current_gaming", {"user_num": user_num, "game_id": game_id})
+
+
+def remove_saving(_saving: str):
+    try:
+        os.remove(os.path.join(HE_ARCHIVER_GAME_DATA_PATH, _saving))
+        if game_data_filepath := current_data_path_of(_saving):
+            os.remove(game_data_filepath)
+            pass
+    except Exception as e:
+        print(e)
+        return None
+    else:
+        return _saving
