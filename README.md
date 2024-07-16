@@ -1,7 +1,7 @@
 # pvzHE-Archiver
  植物大战僵尸杂交版存档管理工具
  
-![Screenshot 2024-06-02 172536](https://github.com/HNRobert/pvzHE-Archiver/assets/120773486/29f72c1a-f282-4fc0-8050-809fffe25368)
+![65DB4DAB6FCDF26E896E5D65DCDB354D](https://github.com/user-attachments/assets/72ec6347-e0e5-4431-a7e0-1a31b5cbe229)
 
 ## 功能概述
 
@@ -11,10 +11,6 @@
 
 也可以自动在无尽模式进入下一个关卡时自动保存，
 并在历史任意关卡的任何时间节点重新切入。
+可以有效防止游戏闪退给你带来惨重的损失
 
-还有备注功能便于管理归档。
-
-## Postscript
-
-当前软件处于测试阶段，
-后续将继续更新，推出筛选与排序功能
+还有备注、筛选、排序等功能便于管理归档。
