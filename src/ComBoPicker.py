@@ -164,8 +164,7 @@ class Combopicker(ttk.Entry, Picker):
         for pre_value in previous_values:
             if pre_value in values_in:
                 result += pre_value + '|'
-        if not result == '' and result[-1] == '|':
-            result = result[:-1]
+        result = result[:-1] if result.endswith('|') else result
         self.delete(0, 'end')
         self.insert(0, result)
 
@@ -173,10 +172,10 @@ class Combopicker(ttk.Entry, Picker):
         if not (new_value in self.values):
             self.values.append(new_value)
             self.update_values(self.values[1:])
-            self.on_selected_check(new_value)
+            self.on_selected_check(new_value, append=True)
         self.hide_picker()
 
-    def on_selected_check(self, _selected):
+    def on_selected_check(self, _selected, append=False):
         value = []
         all_name = self.allname_var.get()
         need_refresh = False
@@ -218,7 +217,8 @@ class Combopicker(ttk.Entry, Picker):
         if need_refresh:
             self.hide_picker()
             self.show_picker()
-        self.event_generate('<<CheckButtonSelect>>')
+        if not append:
+            self.event_generate('<<CheckButtonSelected>>')
 
     def _on_click(self, event):
         str_widget = str(event.widget)

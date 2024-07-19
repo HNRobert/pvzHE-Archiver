@@ -157,9 +157,13 @@ class WidgetTable(tk.LabelFrame):
 
         self._select_column_data = WidColData(
             id=0, wid_text="", widget_type=ttk.Checkbutton, select_col=True, widget_padding=(6, 0, 0, 0))
-        
+
         self.master.geometry(
             f"{self.table_frame.winfo_width()}x{self.table_frame.winfo_height()}")
+
+    def fixed_col(self, x): return x + 1 if x > 0 and not self.select_mode else x
+
+    def fixed_span(self, x) -> int: return 2 if not self.select_mode and x == 0 else 1
 
     def enter_select_mode(self):
         if self.select_mode:
@@ -170,7 +174,6 @@ class WidgetTable(tk.LabelFrame):
         #    rt_data is None) else self.runtime_columns_data
         self.runtime_columns_data = [
             self._select_column_data] + self.columns_data
-        print([data.id for data in self.runtime_columns_data])
         self.refresh_columns()
         self._set_rows()
 
@@ -185,7 +188,6 @@ class WidgetTable(tk.LabelFrame):
         for _row in self.rows_data:
             _row.wid_variable_dict[0].set(False)
         self.refresh_columns()
-        print(self.table_frame.grid_size())
         """
         for c in self.saving_frame.winfo_children():
             print(c.info)
@@ -242,11 +244,12 @@ class WidgetTable(tk.LabelFrame):
         for i, c_label in enumerate(self.column_titles):
             self._column_label_var[i] = ttk.Label(
                 self.table_frame, text=c_label)
-            self._column_label_var[i].grid(row=0, column=i, pady=5)
+            self._column_label_var[i].grid(row=0, column=self.fixed_col(i), columnspan=self.fixed_span(i), pady=5)
 
             # 设置列的拉伸属性和最小宽度
-            self.table_frame.columnconfigure(i, weight=1 if self.runtime_columns_data[i].stretchable else 0,
-                                              minsize=self.runtime_columns_data[i].min_width)
+            self.table_frame.columnconfigure(self.fixed_col(i), weight=1 if self.runtime_columns_data[i].stretchable else 0,
+                                             minsize=self.runtime_columns_data[i].min_width)
+
         self._set_rows()
 
     def _rm_seps(self):
@@ -269,17 +272,18 @@ class WidgetTable(tk.LabelFrame):
             self.title_col_sep_list.append(ttk.Separator(
                 self.table_frame, orient="vertical"))
             self.title_col_sep_list[-1].grid(row=0, rowspan=1,
-                                             column=col, sticky='NSEW')
+                                             column=self.fixed_col(col), sticky='NSEW')
         for col in range(2 * self.column_num):
             self.first_row_sep_list.append(ttk.Separator(
                 self.table_frame, orient='horizontal'))
-            self.first_row_sep_list[-1].grid(row=col // self.column_num, column=col %
-                                             self.column_num, padx=1, sticky='NSEW')
+            self.first_row_sep_list[-1].grid(row=col // self.column_num, column=self.fixed_col(col %
+                                             self.column_num), columnspan=self.fixed_span(col %
+                                             self.column_num), padx=1, sticky='NSEW')
         for col in range(self.column_num):
             self.final_row_sep_list.append(ttk.Separator(
                 self.table_frame, orient="horizontal"))
             self.final_row_sep_list[-1].grid(row=0,
-                                             column=col, padx=1, sticky='NSEW')
+                                             column=self.fixed_col(col), columnspan=self.fixed_span(col), padx=1, sticky='NSEW')
 
     def _adj_seps(self):
         current_row_count = len(self.shown_rows_data)
@@ -364,7 +368,8 @@ class WidgetTable(tk.LabelFrame):
                                   col_data.command, col_data.id, row_data))
         elif col_data.widget_type == ttk.Checkbutton:
             return ttk.Checkbutton(self.table_frame, textvariable=self._get_wid_text(col_data, row_data),
-                                   command=lambda id=row_data.id: col_data.command(id),
+                                   command=lambda id=row_data.id: col_data.command(
+                                       id),
                                    variable=row_data.wid_variable_dict[col_data.id],
                                    padding=col_data.widget_padding)
         else:
@@ -374,10 +379,10 @@ class WidgetTable(tk.LabelFrame):
     def _rearrange_lines(self):
         # Copy the list to avoid modifying the original
         self.shown_rows_data = list(self.rows_data)
-        if not(self.filter_algo is None):
+        if not (self.filter_algo is None):
             self.shown_rows_data = list(
                 filter(self.filter_algo, self.shown_rows_data))
-        if not(self.sort_algo is None):
+        if not (self.sort_algo is None):
             self.shown_rows_data.sort(
                 key=self.sort_algo, reverse=self.sort_reverse)
 
@@ -388,7 +393,7 @@ class WidgetTable(tk.LabelFrame):
         for _row_idx, _row_data in enumerate(self.shown_rows_data):
             for _col_idx in range(self.column_num):
                 self.column_widget_dicts[_col_idx][_row_data.id].grid(
-                    row=_row_idx + 1, column=_col_idx, padx=5, pady=2, sticky='NSEW')
+                    row=_row_idx + 1, column=self.fixed_col(_col_idx), columnspan=self.fixed_span(_col_idx), padx=5, pady=2, sticky='NSEW')
 
         self._adj_seps()
         self.update_idletasks()

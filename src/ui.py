@@ -2,8 +2,10 @@ import os
 import shutil
 import time
 import tkinter as tk
+import tkinter.filedialog as tk_filedialog
 import tkinter.font as tk_font
 import tkinter.messagebox as tk_messagebox
+import winreg
 from threading import Thread
 from tkinter import Tk, ttk
 from typing import List
@@ -14,6 +16,9 @@ from const import HE_ARCHIVER_GAME_DATA_PATH, HE_ARCHIVER_ICON, HE_DATA_PATH
 from global_var import gvar
 from widgetable import WidColData, WidgetTable, WidRowData
 
+WIN_SHELL_KEY = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                               r'Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders')
+DESKTOP_PATH = winreg.QueryValueEx(WIN_SHELL_KEY, "Desktop")[0]
 FILTER_KEYS = ["用户名", "关卡名称", "保存时间", "备注"]
 
 TIME_FILTER_DICT = {
@@ -45,7 +50,6 @@ SORT_REVERSE_DICT = {
     "正序": False,
     "倒序": True
 }
-
 
 
 def mk_ui():
@@ -93,7 +97,9 @@ def mk_ui():
         _arched_game_data = mods.list_arched_game_data()
         _save_rows_data: List[WidRowData] = []
         savings_filter_user_box.update_values([])
+        savings_filter_user_box.entry_var.set("")
         savings_filter_level_box.update_values([])
+        savings_filter_level_box.entry_var.set("")
         for _data in _arched_game_data.keys():
             # add note into the dict
             _arched_game_data[_data]["note"] = ""
@@ -150,6 +156,7 @@ def mk_ui():
             f"{root.winfo_width()}x{min(max(24 * current_line_count + 190, root.winfo_height()), 600)}")
 
     def toggle_del_selection_mode():
+        nonlocal select_mode
         if saving_data_table.select_mode:
             items = saving_data_table.get_selected_rows()
             succ_rm_savings = []
@@ -163,6 +170,7 @@ def mk_ui():
                 return
             
             delete_button.config(text="删除...")
+            select_mode = ""
 
             if reply is False:
                 saving_data_table.quit_select_mode()
@@ -181,6 +189,57 @@ def mk_ui():
         else:
             delete_button.config(text="确定删除")
             saving_data_table.enter_select_mode()
+            select_mode = "d"
+    
+    def import_data():
+        zjs_file = tk_filedialog.askopenfilename(
+            filetypes=(("pvzHE save file", "*.zjs"), ))
+
+        imported = mods.zip2file(zjs_file, HE_ARCHIVER_GAME_DATA_PATH)
+        print(imported)
+        refresh_game_data()
+        tk_messagebox.showinfo(title="pvzHE Archiver", message=f"成功导入「{len(imported)}」个存档!")
+        refresh_button.config(text="导入成功!")
+        root.after(1500, lambda: refresh_button.config(text="刷新"))
+
+
+    def select_export():
+        nonlocal select_mode
+        if select_mode == "d":
+            tk_messagebox.showwarning(title="pvzHE Archiver", message="请先退出删除模式!")
+        elif select_mode == "e":
+            return
+        else:
+            select_mode = "e"
+            delete_button.grid_forget()
+            refresh_button.grid_forget()
+            cancel_export_button.grid(row=3, column=0, padx=10,
+                               ipadx=5, pady=5, sticky='NSEW')
+            export_button.grid(row=3, column=1, columnspan=2, padx=10, ipadx=5,
+                                pady=5, sticky='NSEW')
+            saving_data_table.enter_select_mode()
+    
+    def export_selected_data():
+        data_paths = [os.path.join(HE_ARCHIVER_GAME_DATA_PATH, id) for id in saving_data_table.get_selected_rows()]
+        if data_paths and (zip_name := tk_filedialog.asksaveasfilename(
+                defaultextension=".zjs", 
+                filetypes=(("pvzHE save file", "*.zjs"), ), 
+                initialdir=DESKTOP_PATH)):
+            mods.file2zip(zip_name, data_paths)
+            refresh_button.config(text="导出成功!")
+            root.after(1500, lambda: refresh_button.config(text="刷新"))
+        exit_export_mode()
+
+    def exit_export_mode():
+        nonlocal select_mode
+        cancel_export_button.grid_forget()
+        export_button.grid_forget()
+        delete_button.grid(row=3, column=0, padx=10,
+                           ipadx=5, pady=5, sticky='NSEW')
+        refresh_button.grid(row=3, column=1, columnspan=2, padx=10, ipadx=5,
+                            pady=5, sticky='NSEW')
+        select_mode = ""
+        saving_data_table.quit_select_mode()
 
     def exit_program():
         gvar.set("continue_scanning", False)
@@ -201,6 +260,8 @@ def mk_ui():
     tkfont.config(family='Microsoft YaHei UI')
     root.option_add("*Font", tkfont)
 
+    select_mode = ""
+
     heading_frame = ttk.Frame(root)
     heading_frame.grid(row=0, rowspan=1, column=0, columnspan=3, sticky='NSEW')
     heading_frame.columnconfigure(1, weight=1)
@@ -215,7 +276,7 @@ def mk_ui():
     savings_filter_user_box = Combopicker(
         heading_frame, frameheight=190, allname_textvariable=select_all_text)
     savings_filter_user_box.grid(row=0, column=1, pady=5, sticky='NSEW')
-    savings_filter_user_box.bind("<<CheckButtonSelect>>",
+    savings_filter_user_box.bind("<<CheckButtonSelected>>",
                                  lambda event: set_filter_key())
     heading_blank_label = ttk.Label(heading_frame, text='   ')
     heading_blank_label.grid(row=0, column=2, padx=5, rowspan=1, pady=5, sticky='NSEW')
@@ -225,7 +286,7 @@ def mk_ui():
         heading_frame, frameheight=190, allname_textvariable=select_all_text)
     savings_filter_level_box.grid(
         row=0, column=4, padx=12, pady=5, sticky='NSEW')
-    savings_filter_level_box.bind("<<CheckButtonSelect>>",
+    savings_filter_level_box.bind("<<CheckButtonSelected>>",
                                   lambda event: set_filter_key())
 
     savings_sort_label = ttk.Label(heading_frame, text="排序依据:")
@@ -272,6 +333,12 @@ def mk_ui():
         root, text='刷新', command=lambda: refresh_game_data(True))
     refresh_button.grid(row=3, column=1, columnspan=2, padx=10, ipadx=5,
                         pady=5, sticky='NSEW')
+
+    cancel_export_button = ttk.Button(
+        root, text="取消", command=exit_export_mode)
+    export_button = ttk.Button(
+        root, text="导出", command=export_selected_data)
+
     close_btn = ttk.Button(root, text='退出', command=exit_program)
     close_btn.grid(row=4, column=0, padx=10, ipadx=5, pady=5, sticky='NSEW')
     save_btn = ttk.Button(root, text='保存备注', command=save_note)
@@ -289,25 +356,31 @@ def mk_ui():
     check_new_save_thread = Thread(target=checking_new_save, daemon=True)
     check_new_save_thread.start()
 
-    about_text = """版本: v0.0.2
-更新时间：2024年6月10日 17:30
+    about_text = """版本: v1.0.0 beta2
+更新时间：2024年7月19日 17:30
 作者：Robert He
 网址：https://github.com/HNRobert/pvzHE-Archiver
 
 本软件适用于植物大战僵尸杂交版的
 【游戏自动存档+存档管理】，
-可以在退出游戏返回主菜单时保存游戏进度，
-也可以自动在无尽模式进入下一个关卡时自动保存，
-并在历史任意关卡的任何时间节点重新切入。
-还有备注功能便于管理归档。
-
-当前软件为测试版，
-后续将继续更新，加入筛选排序等功能"""
+功能列表:
+1.在退出游戏返回主菜单时保存游戏进度。
+2.自动在无尽模式进入下一个关卡时自动保存。
+3.在历史任意关卡的任何时间节点重新切入。
+4.便于系统化管理归档的备注功能。
+5.存档筛选与排序功能。
+6.批量导入与导出存档功能。"""
 
     main_menu = tk.Menu(root)
-    help_menu = tk.Menu(main_menu, tearoff=False)
-    help_menu.add_command(label="关于",
-                          command=lambda: tk_messagebox.showinfo(title="关于pvzHE-Archiver", message=about_text))
+
+    file_menu = tk.Menu(main_menu, tearoff=False)
+    file_menu.add_command(label="导入存档", command=import_data)
+    file_menu.add_command(label="导出存档", command=lambda: select_export())
+    file_menu.add_separator()
+    file_menu.add_command(label="刷新", command=lambda: refresh_game_data(True))
+    file_menu.add_command(label="保存备注", command=save_note)
+    file_menu.add_separator()
+    file_menu.add_command(label="退出", command=exit_program)
 
     adv_filter_menu = tk.Menu(main_menu, tearoff=False)
 
@@ -327,9 +400,14 @@ def mk_ui():
             label=_note_filter, variable=note_state_var, value=_note_filter, command=lambda: set_filter_key())
     adv_filter_menu.add_cascade(label="备注状态", menu=note_filter_menu)
 
+    help_menu = tk.Menu(main_menu, tearoff=False)
+    help_menu.add_command(label="关于",
+                          command=lambda: tk_messagebox.showinfo(title="关于pvzHE-Archiver", message=about_text))
+    
+    main_menu.add_cascade(label="文件", menu=file_menu)
     main_menu.add_cascade(label="高级筛选", menu=adv_filter_menu)
-
     main_menu.add_cascade(label="帮助", menu=help_menu)
+
     root.config(menu=main_menu)
     root.mainloop()
 

@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import time
+import zipfile
 
 from win32gui import FindWindow, ShowWindow
 
@@ -214,3 +215,17 @@ def remove_saving(_saving: str):
         return None
     else:
         return _saving
+
+
+def file2zip(zip_file_name: str, file_names: list):
+    with zipfile.ZipFile(zip_file_name, mode='w', compression=zipfile.ZIP_DEFLATED) as zf:
+        for fn in file_names:
+            name = os.path.basename(fn)
+            zf.write(fn, arcname=name)
+
+
+def zip2file(zip_file_name: str, extract_path: str, members=None, pwd=None):
+    with zipfile.ZipFile(zip_file_name) as zf:
+        zf.extractall(extract_path, members=members, pwd=pwd)
+        filename_list = [f.filename for f in zf.filelist]
+    return filename_list
