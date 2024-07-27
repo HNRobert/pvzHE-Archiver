@@ -168,6 +168,10 @@ class Combopicker(ttk.Entry, Picker):
         self.delete(0, 'end')
         self.insert(0, result)
 
+    def set_entry_var(self, values: str):
+        self.entry_var.set(values)
+        self.show_var.set(values)
+
     def append_value(self, new_value):
         if not (new_value in self.values):
             self.values.append(new_value)

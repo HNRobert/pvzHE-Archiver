@@ -158,12 +158,16 @@ class WidgetTable(tk.LabelFrame):
         self._select_column_data = WidColData(
             id=0, wid_text="", widget_type=ttk.Checkbutton, select_col=True, widget_padding=(6, 0, 0, 0))
 
+        """
         self.master.geometry(
             f"{self.table_frame.winfo_width()}x{self.table_frame.winfo_height()}")
+        """
 
-    def fixed_col(self, x): return x + 1 if x > 0 and not self.select_mode else x
+    def fixed_col(self, x): return x + \
+        1 if x > 0 and not self.select_mode else x
 
-    def fixed_span(self, x) -> int: return 2 if not self.select_mode and x == 0 else 1
+    def fixed_span(
+        self, x) -> int: return 2 if not self.select_mode and x == 0 else 1
 
     def enter_select_mode(self):
         if self.select_mode:
@@ -178,7 +182,7 @@ class WidgetTable(tk.LabelFrame):
         self._set_rows()
 
     # it returns the ids of the selected rows
-    def get_selected_rows(self) -> List[str]:
+    def get_selected_rows_id(self) -> List[str]:
         if not self.select_mode:
             raise Exception("Not in select mode")
         return [res for res, val in self.get_column_input(self._select_column_data).items() if val]
@@ -244,7 +248,8 @@ class WidgetTable(tk.LabelFrame):
         for i, c_label in enumerate(self.column_titles):
             self._column_label_var[i] = ttk.Label(
                 self.table_frame, text=c_label)
-            self._column_label_var[i].grid(row=0, column=self.fixed_col(i), columnspan=self.fixed_span(i), pady=5)
+            self._column_label_var[i].grid(row=0, column=self.fixed_col(
+                i), columnspan=self.fixed_span(i), pady=5)
 
             # 设置列的拉伸属性和最小宽度
             self.table_frame.columnconfigure(self.fixed_col(i), weight=1 if self.runtime_columns_data[i].stretchable else 0,
@@ -303,7 +308,7 @@ class WidgetTable(tk.LabelFrame):
         if _row_data in self.rows_data:
             self.rows_data.remove(_row_data)
 
-    def delete_selected_rows(self, del_rows_id: Optional[List[str]]):
+    def delete_rows(self, del_rows_id: Optional[List[str]]):
         if del_rows_id is None:
             return
         for row_id in del_rows_id:
@@ -333,20 +338,21 @@ class WidgetTable(tk.LabelFrame):
                     _col_data, _row_data)
         self._rearrange_lines()
 
-    def _act_command(self, ori_command: Optional[Callable[[str], Any]], col_idx: int, row_data: WidRowData):
+    def _act_command(self, ori_command: Optional[Callable[[str], Any]], col_id: int, row_data: WidRowData):
+        _col_idx = col_id - 1 if not self.select_mode else col_id
         try:
             if not (ori_command is None):
                 ori_command(row_data.id)
         except Exception as e:
             print(e)
-            self.column_widget_dicts[col_idx][row_data.id].config(
-                text=self.runtime_columns_data[col_idx].false_active_text)
+            self.column_widget_dicts[_col_idx][row_data.id].config(
+                text=self.runtime_columns_data[_col_idx].false_active_text)
         else:
-            self.column_widget_dicts[col_idx][row_data.id].config(
-                text=self.runtime_columns_data[col_idx].active_text)
+            self.column_widget_dicts[_col_idx][row_data.id].config(
+                text=self.runtime_columns_data[_col_idx].active_text)
         finally:
-            self.master.after(self.runtime_columns_data[col_idx].active_time, lambda: self.column_widget_dicts[col_idx][row_data.id].config(
-                text=self.runtime_columns_data[col_idx].text))
+            self.master.after(self.runtime_columns_data[_col_idx].active_time, lambda: self.column_widget_dicts[_col_idx][row_data.id].config(
+                text=self.runtime_columns_data[_col_idx].text))
 
     def _get_wid_text(self, col_data: WidColData, row_data: WidRowData):
         if col_data.text is None:

@@ -7,7 +7,7 @@ import zipfile
 
 from win32gui import FindWindow, ShowWindow
 
-from const import (ARCHED_DAT_PATTERN, GAME_DAT_PATTERN, HE_ARCHIVER_DATA,
+from const import (ARCHED_DAT_PATTERN, GAME_DAT_PATTERN,
                    HE_ARCHIVER_GAME_DATA_PATH, HE_DATA_PATH, USERS_DAT)
 from global_var import gvar
 from levels_name_data import DATA as LEVEL_NAMES_DATA
@@ -26,12 +26,14 @@ def has_archiver_process():
 
 
 def read_json(filename):
+    if not os.path.isfile(filename):
+        return {}
     with open(filename, 'r') as file:
         return json.load(file)
 
 
-def write_json(_data):
-    with open(HE_ARCHIVER_DATA, 'w') as file:
+def write_json(_data, _file):
+    with open(_file, 'w') as file:
         json.dump(_data, file, indent=4)
 
 
@@ -98,6 +100,7 @@ def level_name_of(str_id: str):
         return f"冒险模式 第{str(int_id - 255)}关"
     if str_id in LEVEL_NAMES_DATA.keys() and "name" in LEVEL_NAMES_DATA[str_id].keys():
         return LEVEL_NAMES_DATA[str_id]["name"]
+    return f"未知关卡 NO.{str_id}"
 
 
 def list_arched_game_data():
@@ -112,7 +115,8 @@ def list_arched_game_data():
         d_t = file_info_dict["date_time"]
         if user_name in user_info.keys():
             user_name = user_info[user_name]["username"]
-        date_time_label = d_t[:4] + "-" + d_t[4:6] + "-" + d_t[6:8] + " " + d_t[9:11] + ":" + d_t[11:13] + ":" + d_t[13:]
+        date_time_label = d_t[:4] + "-" + d_t[4:6] + "-" + d_t[6:8] + \
+            " " + d_t[9:11] + ":" + d_t[11:13] + ":" + d_t[13:]
         file_info_dict["user_name"] = user_name
         file_info_dict["level_name"] = level_name
         file_info_dict["save_time"] = date_time_label
