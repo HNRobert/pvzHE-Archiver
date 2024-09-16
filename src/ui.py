@@ -460,8 +460,8 @@ def mk_ui():
     root.bind_all('<F5>', lambda event: refresh_game_data(True))
     root.grid_columnconfigure(1, weight=1, minsize=200)
 
-    about_text = """版本: v1.0.0
-更新时间：2024年7月26日 23:30
+    about_text = """版本: v1.0.1
+更新时间：2024年9月16日 11:00
 作者：Robert He
 网址：https://github.com/HNRobert/pvzHE-Archiver
 
