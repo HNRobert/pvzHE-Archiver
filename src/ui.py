@@ -538,7 +538,7 @@ def mk_ui():
 
     if not gvar.get("game_exist"):
         tk_messagebox.showwarning(title="提示", message="没有找到植物大战僵尸杂交版的游戏存档")
-    refresh_game_data(False, True)
+    refresh_game_data(True, True)
     resize_root()
 
     check_new_save_thread = Thread(target=checking_new_save, daemon=True)
