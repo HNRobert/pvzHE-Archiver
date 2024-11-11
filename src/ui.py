@@ -8,7 +8,7 @@ import tkinter.messagebox as tk_messagebox
 import winreg
 from threading import Thread
 from tkinter import Tk, ttk
-from typing import List
+from typing import List, Callable
 
 import mods
 from ComBoPicker import Combopicker
@@ -71,18 +71,12 @@ def mk_ui():
     def read_column_input(column_data: WidColData):
         return saving_data_table.get_column_input(column_data)
 
-    def save_config():
+    def save_and_prompt(func: Callable):
+        func()
+        tk_messagebox.showinfo(title="pvzHE Archiver", message="保存成功!")
+
+    def save_sort_filter_settings():
         nonlocal saved_config
-        """
-        _note_data: dict = gvar.get("note_data")
-        for _t in arched_game_data.keys():
-            c_note = savings_note_dict[_t].get()
-            arched_game_data[_t]["note"] = c_note
-            _note_data[_t] = c_note
-        """
-        _note_data = read_column_input(save_note_col)
-        gvar.set("note_data", _note_data)
-        mods.write_json(_note_data, HE_ARCHIVER_DATA)
 
         saved_config = {
             "savings_filter_user_box": savings_filter_user_box.get(),
@@ -97,8 +91,17 @@ def mk_ui():
         }
         mods.write_json(saved_config, HE_ARCHIVER_CONFIG)
 
+    def save_notes():
+        _note_data = read_column_input(save_note_col)
+        gvar.set("note_data", _note_data)
+        mods.write_json(_note_data, HE_ARCHIVER_DATA)
+
+    def save_all():
+        save_notes()
+        save_sort_filter_settings()
+
         save_btn.config(text="成功!")
-        root.after(1000, lambda: save_btn.config(text="保存备注与设置"))
+        root.after(1000, lambda: save_btn.config(text="保存所有设置"))
 
     def checking_new_save():
         while gvar.get("continue_scanning"):
@@ -403,11 +406,11 @@ def mk_ui():
                              lambda event: set_sort_key())
 
     save_username_col = WidColData(1, title="用户名", widget_type=ttk.Label, data_key="user_name",
-                                   stretchable=False, min_width=30)
+                                   stretchable=False, min_width=50)
     save_level_col = WidColData(2, title="关卡名称", widget_type=ttk.Label, data_key="level_name",
-                                stretchable=False, min_width=50)
+                                stretchable=False, min_width=70)
     save_time_col = WidColData(3, title="保存时间", widget_type=ttk.Label, data_key="save_time",
-                               stretchable=False, min_width=50)
+                               stretchable=False, min_width=70)
     save_note_col = WidColData(4, title="备注", widget_type=ttk.Entry, data_key="note",
                                stretchable=True, min_width=100)
     save_extract_col = WidColData(5, title="提取", wid_text="提取", active_text="成功!",
@@ -447,12 +450,12 @@ def mk_ui():
 
     close_btn = ttk.Button(root, text='退出', command=exit_program)
     close_btn.grid(row=4, column=0, padx=10, ipadx=5, pady=5, sticky='NSEW')
-    save_btn = ttk.Button(root, text='保存备注与设置', command=save_config)
+    save_btn = ttk.Button(root, text='保存所有设置', command=save_all)
     save_btn.grid(row=4, column=1, columnspan=2, padx=10, ipadx=25, pady=5,
                   sticky='NSEW')
-    root.bind_all('<Return>', lambda event: save_config())
-    root.bind_all('<Control-s>', lambda event: save_config())
-    root.bind_all('<Control-S>', lambda event: save_config())
+    root.bind_all('<Return>', lambda event: save_all())
+    root.bind_all('<Control-s>', lambda event: save_all())
+    root.bind_all('<Control-S>', lambda event: save_all())
     root.bind_all('<Control-e>', lambda event: select_export())
     root.bind_all('<Control-E>', lambda event: select_export())
     root.bind_all('<Control-o>', lambda event: import_data())
@@ -460,8 +463,9 @@ def mk_ui():
     root.bind_all('<F5>', lambda event: refresh_game_data(True))
     root.grid_columnconfigure(1, weight=1, minsize=200)
 
-    about_text = """版本: v1.0.1
-更新时间：2024年9月16日 11:00
+    about_text = """版本: v1.0.2
+兼容性：植物大战僵尸杂交版v2.6.1 (亦向下兼容)
+更新时间：2024年11月11日 21:00
 作者：Robert He
 网址：https://github.com/HNRobert/pvzHE-Archiver
 
@@ -485,8 +489,13 @@ def mk_ui():
                           command=lambda: select_export())
     file_menu.add_separator()
     file_menu.add_command(label="刷新", accelerator="F5", command=lambda: refresh_game_data(True))
+    file_menu.add_separator()
+    file_menu.add_command(label="保存备注",
+                          command=lambda: save_and_prompt(save_notes))
+    file_menu.add_command(label="保存排序与筛选设置",
+                          command=lambda: save_and_prompt(save_sort_filter_settings))
     file_menu.add_command(
-        label="保存备注与设置", accelerator="Ctrl+S", command=save_config)
+        label="保存全部", accelerator="Ctrl+S", command=save_all)
     file_menu.add_separator()
     file_menu.add_command(label="退出", command=exit_program)
 
